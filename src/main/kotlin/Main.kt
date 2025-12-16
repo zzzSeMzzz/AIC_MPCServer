@@ -1,3 +1,6 @@
+
+import core.network.WeatherClient
+import core.network.getForecast
 import io.ktor.utils.io.streams.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
@@ -7,10 +10,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.asSink
 import kotlinx.io.buffered
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 
 
 //sonar, sonar-pro, sonar-reasoning, yandexgpt-lite
@@ -45,29 +45,33 @@ suspend fun main(args: Array<String>) {
     }*/
 
     server.addTool(
-        name = "get_weather",
+        name = "get_forecast",
         description = """
-            Get weather alerts for a US state. Input is Two-letter US state code (e.g. CA, NY)
+            Прогноз погоды для указанной latitude/longitude
         """.trimIndent(),
         inputSchema = ToolSchema(
             properties = buildJsonObject {
-                putJsonObject("state") {
-                    put("type", "string")
-                    put("description", "Two-letter US state code (e.g. CA, NY)")
+                putJsonObject("latitude") {
+                    put("type", "number")
+                }
+                putJsonObject("longitude") {
+                    put("type", "number")
                 }
             },
-            required = listOf("state"),
+            required = listOf("latitude", "longitude"),
         ),
     ) { request ->
-        val state = request.arguments?.get("state")?.jsonPrimitive?.content ?: return@addTool CallToolResult(
-            content = listOf(TextContent("The 'state' parameter is required.")),
-        )
+        val latitude = request.arguments?.get("latitude")?.jsonPrimitive?.doubleOrNull
+        val longitude = request.arguments?.get("longitude")?.jsonPrimitive?.doubleOrNull
+        if (latitude == null || longitude == null) {
+            return@addTool CallToolResult(
+                content = listOf(TextContent("The 'latitude' and 'longitude' parameters are required.")),
+            )
+        }
 
-        val alerts = listOf("Severe weather alert in CA", "Flood warning in NY")//httpClient.getAlerts(state)
+        val forecast = WeatherClient.httpClient.getForecast(latitude, longitude)
 
-        CallToolResult(content = alerts.map {
-            TextContent(it)
-        })
+        CallToolResult(content = forecast.map { TextContent(it) })
     }
 
     val transport = StdioServerTransport(
