@@ -1,9 +1,9 @@
-
-
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
     kotlin("jvm") version "2.2.0"
     kotlin("plugin.serialization") version "2.2.0"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
     application
 }
 
@@ -42,6 +42,14 @@ dependencies {
 
     implementation("org.slf4j:slf4j-simple:2.0.12")
     implementation("io.ktor:ktor-client-logging:3.0.3")
+}
+
+tasks.withType<ShadowJar> {
+    archiveClassifier.set("") // Убираем суффикс `-all`
+    mergeServiceFiles()
+    manifest {
+        attributes(mapOf("Main-Class" to "MainKt"))
+    }
 }
 
 tasks.test {
