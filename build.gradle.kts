@@ -7,7 +7,7 @@ plugins {
     application
 }
 
-group = "ru.sem.ai.challenge"
+group = "ru.sem.ai.challenge.mcp"
 version = "1.0-SNAPSHOT"
 
 
