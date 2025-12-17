@@ -10,12 +10,9 @@ import kotlinx.serialization.Serializable
 // Extension function to fetch forecast information for given latitude and longitude
 suspend fun HttpClient.getForecast(latitude: Double, longitude: Double): List<String> {
     // Build the URI using provided latitude and longitude
-    val uri = "forecast?latitude=$latitude&longitude=$longitude&hourly=temperature_2m"
+    val uri = "v1/forecast?latitude=$latitude&longitude=$longitude&hourly=temperature_2m"
     // Request the points data from the API
     val forecast = this.get(uri).body<ForecastResponse>()
-
-
-    val times = forecast.hourly.time
 
     // Map each forecast period to a formatted string
     return forecast.hourly.time.mapIndexed { index, time ->
@@ -42,7 +39,7 @@ data class ForecastResponse (
     @SerialName("timezone_abbreviation")
     val timezoneAbbreviation: String,
 
-    val elevation: Long,
+    val elevation: Double,
 
     @SerialName("hourly_units")
     val hourlyUnits: HourlyUnits,

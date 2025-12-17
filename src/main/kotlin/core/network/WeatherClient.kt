@@ -8,17 +8,15 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
 
-
-
 // Create an HTTP client with a default request configuration and JSON content negotiation
 
 object WeatherClient {
 
-    private val baseUrl = "https://api.open-meteo.com/v1"
+    private const val BASE_URL = "https://api.open-meteo.com/"
 
     val httpClient = HttpClient {
         defaultRequest {
-            url(baseUrl)
+            url(BASE_URL)
             headers {
                 append("Accept", "application/geo+json")
                 append("User-Agent", "WeatherApiClient/1.0")
@@ -30,9 +28,15 @@ object WeatherClient {
             json(
                 Json {
                     ignoreUnknownKeys = true
-                    prettyPrint = true
+                    isLenient = true
+                    allowSpecialFloatingPointValues = true
                 },
             )
         }
+
+        /*install(Logging) {
+            logger = Logger.DEFAULT // Выводит логи в stdout
+            level = LogLevel.ALL    // Логировать всё: запросы, заголовки, тела
+        }*/
     }
 }

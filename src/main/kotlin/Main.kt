@@ -63,6 +63,7 @@ suspend fun main(args: Array<String>) {
     ) { request ->
         val latitude = request.arguments?.get("latitude")?.jsonPrimitive?.doubleOrNull
         val longitude = request.arguments?.get("longitude")?.jsonPrimitive?.doubleOrNull
+        //println("latitude: $latitude, longitude: $longitude")
         if (latitude == null || longitude == null) {
             return@addTool CallToolResult(
                 content = listOf(TextContent("The 'latitude' and 'longitude' parameters are required.")),
