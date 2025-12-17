@@ -1,4 +1,5 @@
 
+import core.data.ReminderStore
 import core.network.WeatherClient
 import core.network.getForecast
 import io.ktor.utils.io.streams.*
@@ -6,15 +7,17 @@ import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import io.modelcontextprotocol.kotlin.sdk.types.*
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import kotlinx.io.asSink
 import kotlinx.io.buffered
 import kotlinx.serialization.json.*
+import java.time.Instant
 
 
 //sonar, sonar-pro, sonar-reasoning, yandexgpt-lite
 suspend fun main(args: Array<String>) {
+    val store = ReminderStore()
+
     val server = Server(
         Implementation(
             name = "SemWeatherMcpServerKt", // Tool name is "weather"
@@ -75,6 +78,90 @@ suspend fun main(args: Array<String>) {
         CallToolResult(content = forecast.map { TextContent(it) })
     }
 
+
+    // add_reminder
+    server.addTool(
+        name = "add_reminder",
+        description = "Add reminder with due time (ISO-8601 string)",
+        inputSchema = ToolSchema(buildJsonObject {
+            put("type", "object")
+            putJsonObject("properties") {
+                putJsonObject("text") { put("type", "string") }
+                putJsonObject("due_at") {
+                    put("type", "string")
+                    put("description", "ISO-8601 datetime, UTC")
+                }
+            }
+            putJsonArray("required") { add("text"); add("due_at") }
+        }
+        )
+    ) { request ->
+        val args = request.arguments ?: JsonObject(emptyMap())
+        val text = args["text"]?.jsonPrimitive?.content
+            ?: error("text is required")
+        val dueAtStr = args["due_at"]?.jsonPrimitive?.content
+            ?: error("due_at is required")
+        val dueAt = Instant.parse(dueAtStr)
+
+        store.add(text, dueAt)
+
+        CallToolResult(
+            content = listOf(
+                TextContent(
+                    text = "Reminder added: \"$text\" at $dueAtStr"
+                )
+            )
+        )
+    }
+
+    // list_reminders
+    server.addTool(
+        name = "list_reminders",
+        description = "List all reminders",
+        inputSchema = ToolSchema(buildJsonObject {
+            put("type", "object")
+            putJsonObject("properties") { }
+        })
+    ) {
+        val items = store.list()
+        val text = if (items.isEmpty()) {
+            "No reminders"
+        } else {
+            items.joinToString("\n") { r ->
+                "${r.id} | [${if (r.done) "x" else " "}] ${r.text} (due ${r.dueAt})"
+            }
+        }
+        CallToolResult(
+            content = listOf(TextContent(text = text))
+        )
+    }
+
+    // complete_reminder
+    server.addTool(
+        name = "complete_reminder",
+        description = "Mark reminder as done by id",
+        inputSchema = ToolSchema(buildJsonObject {
+            put("type", "object")
+            putJsonObject("properties") {
+                putJsonObject("id") { put("type", "integer") }
+            }
+            putJsonArray("required") { add("id") }
+        }
+        )
+    ) { request ->
+        val args = request.arguments ?: JsonObject(emptyMap())
+        val id = args["id"]?.jsonPrimitive?.long
+            ?: error("id is required")
+        store.complete(id)
+
+        CallToolResult(
+            content = listOf(
+                TextContent(text = "Reminder $id completed")
+            )
+        )
+    }
+
+
     val transport = StdioServerTransport(
         System.`in`.asInput(),
         System.out.asSink().buffered(),
@@ -82,11 +169,44 @@ suspend fun main(args: Array<String>) {
 
     runBlocking {
         val session = server.createSession(transport)
+        val sessionId = session.sessionId   // или аналогичное свойство/метод в твоей версии SDK [web:22]
+
+        // запускаем планировщик В ЭТОМ ЖЕ runBlocking, после createSession
+        startScheduler(server, store, sessionId)
+
         val done = Job()
-        session.onClose {
-            done.complete()
-        }
+        session.onClose { done.complete() }
         done.join()
+    }
+}
+
+private const val CHECK_INTERVAL_SECONDS = 300L
+
+suspend fun startScheduler(server: Server, store: ReminderStore, sessionId: String) = coroutineScope {
+    launch {
+        while (isActive) {
+            delay(CHECK_INTERVAL_SECONDS * 1000)
+            val due = store.dueOrOverdue(Instant.now())
+            if (due.isEmpty()) continue
+            val summary = buildString {
+                append("Просроченные/текущие задачи:\n")
+                due.forEach { r -> append("${r.id}: ${r.text} (due ${r.dueAt})\n") }
+            }
+            // стандартный notification уровня INFO [web:59]
+
+            val params = LoggingMessageNotificationParams(
+                level = LoggingLevel.Info,
+                logger = "reminder",
+                data = buildJsonObject {
+                    put("message", summary)
+                }
+            )
+
+            server.sendLoggingMessage(
+                sessionId = sessionId,
+                notification = LoggingMessageNotification(params)
+            )
+        }
     }
 }
 
