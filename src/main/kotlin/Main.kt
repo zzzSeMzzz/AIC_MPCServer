@@ -180,7 +180,7 @@ suspend fun main(args: Array<String>) {
     }
 }
 
-private const val CHECK_INTERVAL_SECONDS = 300L
+private const val CHECK_INTERVAL_SECONDS = 30L
 
 suspend fun startScheduler(server: Server, store: ReminderStore, sessionId: String) = coroutineScope {
     launch {
