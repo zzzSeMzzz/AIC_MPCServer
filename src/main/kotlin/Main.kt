@@ -25,7 +25,8 @@ suspend fun main(args: Array<String>) {
         ),
         ServerOptions(
             capabilities = ServerCapabilities(
-                tools = ServerCapabilities.Tools(listChanged = true)
+                tools = ServerCapabilities.Tools(listChanged = true),
+                logging = ServerCapabilities.Logging
             ),
         ),
     )
@@ -180,13 +181,14 @@ suspend fun main(args: Array<String>) {
     }
 }
 
-private const val CHECK_INTERVAL_SECONDS = 30L
+private const val CHECK_INTERVAL_SECONDS = 3L
 
-suspend fun startScheduler(server: Server, store: ReminderStore, sessionId: String) = coroutineScope {
+suspend fun startScheduler(server: Server, store: ReminderStore, sessionId: String,) = coroutineScope {
     launch {
         while (isActive) {
             delay(CHECK_INTERVAL_SECONDS * 1000)
             val due = store.dueOrOverdue(Instant.now())
+           // println("due: ${due.size}")
             if (due.isEmpty()) continue
             val summary = buildString {
                 append("Просроченные/текущие задачи:\n")
@@ -202,10 +204,12 @@ suspend fun startScheduler(server: Server, store: ReminderStore, sessionId: Stri
                 }
             )
 
+
             server.sendLoggingMessage(
                 sessionId = sessionId,
                 notification = LoggingMessageNotification(params)
             )
+            //println("sent success")
         }
     }
 }

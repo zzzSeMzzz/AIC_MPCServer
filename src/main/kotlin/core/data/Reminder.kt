@@ -67,9 +67,10 @@ class ReminderStore(
 
     @Synchronized
     fun dueOrOverdue(now: Instant): List<Reminder> {
-        val nowStr = now.toString()
-        return cache.filter { !it.done && it.dueAt <= nowStr }
-            .sortedBy { it.dueAt }
+        val result = cache
+            .filter { r -> !r.done && Instant.parse(r.dueAt) <= now }
+            .sortedBy { Instant.parse(it.dueAt) }
+        return result
     }
 
     @Synchronized
