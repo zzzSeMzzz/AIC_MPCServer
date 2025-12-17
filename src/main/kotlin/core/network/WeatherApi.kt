@@ -4,88 +4,64 @@ package core.network
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 
 // Extension function to fetch forecast information for given latitude and longitude
 suspend fun HttpClient.getForecast(latitude: Double, longitude: Double): List<String> {
     // Build the URI using provided latitude and longitude
-    val uri = "/points/$latitude,$longitude"
+    val uri = "forecast?latitude=$latitude&longitude=$longitude&hourly=temperature_2m"
     // Request the points data from the API
-    val points = this.get(uri).body<Points>()
+    val forecast = this.get(uri).body<ForecastResponse>()
 
-    // Request the forecast using the URL provided in the points response
-    val forecast = this.get(points.properties.forecast).body<Forecast>()
+
+    val times = forecast.hourly.time
 
     // Map each forecast period to a formatted string
-    return forecast.properties.periods.map { period ->
+    return forecast.hourly.time.mapIndexed { index, time ->
         """
-            ${period.name}:
-            Temperature: ${period.temperature} ${period.temperatureUnit}
-            Wind: ${period.windSpeed} ${period.windDirection}
-            Forecast: ${period.detailedForecast}
+            ${time}:
+            Temperature: ${forecast.hourly.temperature2M[index]} °C
         """.trimIndent()
     }
 }
 
-/*suspend fun HttpClient.getAlerts(state: String): List<String> {
-    // Build the URI using the given state code
-    val uri = "/alerts/active/area/$state"
-    // Request the alerts data from the API
-    val alerts = this.get(uri).body<Alert>()
-
-    // Map each alert feature to a formatted string
-    return alerts.features.map { feature ->
-        """
-            Event: ${feature.properties.event}
-            Area: ${feature.properties.areaDesc}
-            Severity: ${feature.properties.severity}
-            Description: ${feature.properties.description}
-            Instruction: ${feature.properties.instruction}
-        """.trimIndent()
-    }
-}*/
-
-// Data class representing the points response from the API
 @Serializable
-data class Points(
-    val properties: Properties
-) {
-    @Serializable
-    data class Properties(val forecast: String)
-}
+data class ForecastResponse (
+    val latitude: Double,
+    val longitude: Double,
 
-// Data class representing the forecast response from the API
+    @SerialName("generationtime_ms")
+    val generationtimeMS: Double,
+
+    @SerialName("utc_offset_seconds")
+    val utcOffsetSeconds: Long,
+
+    val timezone: String,
+
+    @SerialName("timezone_abbreviation")
+    val timezoneAbbreviation: String,
+
+    val elevation: Long,
+
+    @SerialName("hourly_units")
+    val hourlyUnits: HourlyUnits,
+
+    val hourly: Hourly
+)
+
 @Serializable
-data class Forecast(
-    val properties: Properties
-) {
-    @Serializable
-    data class Properties(val periods: List<Period>)
+data class Hourly (
+    val time: List<String>,
 
-    @Serializable
-    data class Period(
-        val number: Int, val name: String, val startTime: String, val endTime: String,
-        val isDaytime: Boolean, val temperature: Int, val temperatureUnit: String,
-        val temperatureTrend: String, val probabilityOfPrecipitation: JsonObject,
-        val windSpeed: String, val windDirection: String,
-        val shortForecast: String, val detailedForecast: String,
-    )
-}
+    @SerialName("temperature_2m")
+    val temperature2M: List<Double>
+)
 
-// Data class representing the alerts response from the API
 @Serializable
-data class Alert(
-    val features: List<Feature>
-) {
-    @Serializable
-    data class Feature(
-        val properties: Properties
-    )
+data class HourlyUnits (
+    val time: String,
 
-    @Serializable
-    data class Properties(
-        val event: String, val areaDesc: String, val severity: String,
-        val description: String, val instruction: String?,
-    )
-}
+    @SerialName("temperature_2m")
+    val temperature2M: String
+)

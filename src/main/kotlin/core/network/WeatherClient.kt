@@ -14,7 +14,7 @@ import kotlinx.serialization.json.Json
 
 object WeatherClient {
 
-    private val baseUrl = "https://api.weather.gov"
+    private val baseUrl = "https://api.open-meteo.com/v1"
 
     val httpClient = HttpClient {
         defaultRequest {
