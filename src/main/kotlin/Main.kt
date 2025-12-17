@@ -173,6 +173,7 @@ suspend fun main(args: Array<String>) {
         val sessionId = session.sessionId   // или аналогичное свойство/метод в твоей версии SDK [web:22]
 
         // запускаем планировщик В ЭТОМ ЖЕ runBlocking, после createSession
+        checkDueReminders(server, store, sessionId)
         startScheduler(server, store, sessionId)
 
         val done = Job()
@@ -181,35 +182,38 @@ suspend fun main(args: Array<String>) {
     }
 }
 
-private const val CHECK_INTERVAL_SECONDS = 3L
+private const val CHECK_INTERVAL_SECONDS = 30L
 
-suspend fun startScheduler(server: Server, store: ReminderStore, sessionId: String,) = coroutineScope {
+suspend fun checkDueReminders(server: Server, store: ReminderStore, sessionId: String) {
+    val due = store.dueOrOverdue(Instant.now())
+    // println("due: ${due.size}")
+    if (due.isEmpty()) return
+    val summary = buildString {
+        append("Просроченные/текущие задачи:\n")
+        due.forEach { r -> append("${r.id}: ${r.text} (due ${r.dueAt})\n") }
+    }
+    // стандартный notification уровня INFO [web:59]
+
+    val params = LoggingMessageNotificationParams(
+        level = LoggingLevel.Info,
+        logger = "reminder",
+        data = buildJsonObject {
+            put("message", summary)
+        }
+    )
+
+
+    server.sendLoggingMessage(
+        sessionId = sessionId,
+        notification = LoggingMessageNotification(params)
+    )
+}
+
+suspend fun startScheduler(server: Server, store: ReminderStore, sessionId: String) = coroutineScope {
     launch {
         while (isActive) {
             delay(CHECK_INTERVAL_SECONDS * 1000)
-            val due = store.dueOrOverdue(Instant.now())
-           // println("due: ${due.size}")
-            if (due.isEmpty()) continue
-            val summary = buildString {
-                append("Просроченные/текущие задачи:\n")
-                due.forEach { r -> append("${r.id}: ${r.text} (due ${r.dueAt})\n") }
-            }
-            // стандартный notification уровня INFO [web:59]
-
-            val params = LoggingMessageNotificationParams(
-                level = LoggingLevel.Info,
-                logger = "reminder",
-                data = buildJsonObject {
-                    put("message", summary)
-                }
-            )
-
-
-            server.sendLoggingMessage(
-                sessionId = sessionId,
-                notification = LoggingMessageNotification(params)
-            )
-            //println("sent success")
+            checkDueReminders(server, store, sessionId)
         }
     }
 }
