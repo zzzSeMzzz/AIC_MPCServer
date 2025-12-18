@@ -11,6 +11,9 @@ import kotlinx.coroutines.*
 import kotlinx.io.asSink
 import kotlinx.io.buffered
 import kotlinx.serialization.json.*
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.time.Instant
 
 
@@ -163,6 +166,59 @@ suspend fun main(args: Array<String>) {
     }
 
 
+    server.addTool(
+        name = "save_to_file",
+        description = "Save given text content into a file on disk",
+        inputSchema = ToolSchema(
+            properties = buildJsonObject {
+                putJsonObject("path") {
+                    put("type", "string")
+                    put("description", "Relative file path to save to")
+                }
+                putJsonObject("content") {
+                    put("type", "string")
+                    put("description", "Text content to write")
+                }
+                // можно добавить optional append: bool, если понадобится
+            },
+            required = listOf("path", "content")
+        )
+    ) { request ->
+        val args = request.arguments ?: JsonObject(emptyMap())
+
+        val pathStr = args["path"]?.jsonPrimitive?.content
+            ?: error("path is required")
+        val content = args["content"]?.jsonPrimitive?.content
+            ?: error("content is required")
+
+        // базовая защита: сохраняем только в папку data/ и запрещаем выход выше
+        val baseDir = Path.of("data").toAbsolutePath()
+        Files.createDirectories(baseDir)
+        val target = baseDir.resolve(pathStr).normalize()
+
+        require(target.startsWith(baseDir)) {
+            "Path escape is not allowed"
+        }
+
+        Files.createDirectories(target.parent)
+        Files.writeString(
+            target,
+            content,
+            StandardOpenOption.CREATE,
+            StandardOpenOption.TRUNCATE_EXISTING,
+            StandardOpenOption.WRITE
+        )
+
+        CallToolResult(
+            content = listOf(
+                TextContent(
+                    text = "Saved to ${target.toAbsolutePath()}"
+                )
+            )
+        )
+    }
+
+
     val transport = StdioServerTransport(
         System.`in`.asInput(),
         System.out.asSink().buffered(),
@@ -174,7 +230,7 @@ suspend fun main(args: Array<String>) {
 
         // запускаем планировщик В ЭТОМ ЖЕ runBlocking, после createSession
         checkDueReminders(server, store, sessionId)
-        startScheduler(server, store, sessionId)
+        //startScheduler(server, store, sessionId)
 
         val done = Job()
         session.onClose { done.complete() }
