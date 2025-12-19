@@ -1,4 +1,5 @@
 import core.data.ReminderStore
+import core.tools.addAndroidTool
 import core.tools.addReminderTools
 import core.tools.addSaveToFileTool
 import core.tools.addWeatherTool
@@ -51,6 +52,8 @@ suspend fun main(args: Array<String>) {
     addReminderTools(server, ReminderStore())
 
     addSaveToFileTool(server)
+
+    addAndroidTool(server)
 
     val transport = StdioServerTransport(
         System.`in`.asInput(),
