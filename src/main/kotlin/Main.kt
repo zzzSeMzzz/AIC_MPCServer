@@ -1,7 +1,4 @@
-
 import core.data.ReminderStore
-import core.network.WeatherClient
-import core.network.getForecast
 import core.tools.addReminderTools
 import core.tools.addSaveToFileTool
 import core.tools.addWeatherTool
@@ -9,15 +6,12 @@ import io.ktor.utils.io.streams.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
-import io.modelcontextprotocol.kotlin.sdk.types.*
-import kotlinx.coroutines.*
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.runBlocking
 import kotlinx.io.asSink
 import kotlinx.io.buffered
-import kotlinx.serialization.json.*
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardOpenOption
-import java.time.Instant
 
 
 //sonar, sonar-pro, sonar-reasoning, yandexgpt-lite
@@ -57,7 +51,6 @@ suspend fun main(args: Array<String>) {
     addReminderTools(server, ReminderStore())
 
     addSaveToFileTool(server)
-
 
     val transport = StdioServerTransport(
         System.`in`.asInput(),
